@@ -1,0 +1,991 @@
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+<link rel="import" href="../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../bower_components/paper-toast/paper-toast.html">
+<link rel="import" href="../../bower_components/paper-input/paper-input.html">
+
+<dom-module id="img-crop">
+  <template>
+    <style>
+      :host {
+        display: block;
+        margin: 5px;
+      }
+
+      paper-button {
+        margin: 10px;
+      }
+
+      #cropperContainer {
+        margin: auto;
+        display: block;
+      }
+
+     .previews {
+          margin-left: 0px;
+        }
+     .previewSmall {
+          border: 1px solid #ccc;
+          width: 100px;
+          height: 100px;
+          display: block;
+          margin: auto;
+        }
+
+      #previewThumb {
+
+          width: 48px;
+          height: 48px;
+          margin-top: 7px;
+          margin-left: 8px;
+      }
+
+      .blue {
+        background-color: #5677fc;
+        color: white;
+      }
+
+      ::content  img {
+        max-height: 350px;
+        max-width: 100%;
+        /*width: 300px;*/
+        margin: auto 0;
+        /*position: absolute;*/
+        z-index: 1;
+        /*width: 100%;*/
+      }
+
+
+
+      ::content .icropper {
+          position: relative;
+      }
+
+      ::content .no-select {
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          -khtml-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+      }
+
+      ::content .icropper  .crop-node {
+          border: 1px dotted #999;
+          position: absolute;
+          z-index: 8;
+          left:10px;
+          top: 10px;
+          cursor: move;
+      }
+
+      ::content .crop-node {
+          border: 1px dotted #999;
+          position: absolute;
+          z-index: 8;
+          left:10px;
+          top: 10px;
+          cursor: move;
+      }
+
+      ::content .icropper .anchor{
+          width: 9px;
+          height: 9px;
+          border: 2px solid #ccc;
+          border-radius: 50%;
+          position: absolute;
+          z-index: 11;
+      }
+
+      ::content .icropper .anchor-lt    {   cursor: nw-resize; left:-8px; top: -8px;}
+      ::content .icropper .anchor-t     {   cursor: n-resize; top: -8px; }
+      ::content .icropper .anchor-rt    {   cursor: ne-resize; right: -4px; top: -8px;}
+      ::content .icropper .anchor-r     {   cursor: e-resize; right: -8px;}
+      ::content .icropper .anchor-rb    {   cursor: se-resize; right: -8px; bottom: -8px;}
+      ::content .icropper .anchor-b     {   cursor: s-resize; bottom: -8px;}
+      ::content .icropper .anchor-lb    {   cursor: sw-resize; left: -8px; bottom: -8px;}
+      ::content .icropper .anchor-l     {   cursor: w-resize; left: -8px;}
+
+
+      ::content .icropper .block    {
+          position: absolute;
+          opacity:0.5;
+          z-index: 5;
+          background-color: #000;
+
+          /* IE 8 */
+          -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
+          /* IE 5-7 */
+          filter: alpha(opacity=50);
+      }
+      ::content .icropper .block-l  {    left: 0; }
+      ::content .icropper .block-t  {    top: 0; width: 100%; }
+      ::content .icropper .block-r  {    right: 0; }
+      ::content .icropper .block-b  {    bottom: 0; width: 100%; }
+
+      ::content .icropper img {
+          /*position: absolute;*/
+          z-index: 1;
+          left: 0;
+          top: 0;
+      }
+
+
+
+
+    </style>
+
+      <div class="upload layout horizontal">
+        <!--noink because OS X file upload dialog animation makes ink animation stuck-->
+<!--         <paper-fab mini noink icon="file-upload" class="blue" on-tap="on_upload_dialog"></paper-fab> -->
+
+        <paper-button raised class="blue center" on-tap="on_upload_dialog">
+          Choose file
+        </paper-button>
+        <paper-button on-tap='onUpload' raised class='' disabled$='{{!file}}'>
+          <iron-icon icon='file-upload'></iron-icon>
+        Upload
+        </paper-button>
+        <!-- <span id='previewThumb' class='previews'></span> -->
+      </div>
+    <input type="file" id="fileInput" on-change="fileChange" hidden accept="image/x-png, image/gif, image/jpeg" >
+
+
+    <div hidden$='{{!file}}'>
+
+      <div class='layout_ horizontal_'>
+        <div class='flex_ cropperContainer' id='cropperContainer'> </div>
+        &nbsp;
+        <!-- <div class="layout_ vertical_ center-justified_"> -->
+        <!-- <div id="previewSmall" class="previewSmall"></div> -->
+
+        <div class="layout horizontal center-justified_"> </div>
+        <!-- <paper-button on-tap='onUpload' raised class=''>Upload</paper-button> -->
+
+          <!-- <paper-progress value="{{progress}}"></paper-progress> -->
+
+
+      </div>
+
+      <paper-toast id="toastSuccess" text="Image uploaded successfully!"></paper-toast>
+      <paper-toast id="toastFail" text="Error uploading file!"></paper-toast>
+    </div>
+
+
+  </template>
+  <script>
+  (function() {
+    'use strict';
+
+
+
+
+    Polymer({
+      is: 'img-crop',
+
+      properties: {
+        image: {
+          type: String,
+          notify: true
+        },
+        uploadUrl: {
+          type: String,
+          value: 'http://localhost:9000/api/users/picturetest'
+        },
+        file: {
+          type: String,
+          value: null
+        },
+        authToken: {
+          type: String,
+          value: null
+        }
+
+      },
+      attached: function() {
+        // console.log('ready')
+        this.gap = 10;
+        this.minWidth = 20;
+        this.minHeight = 20;
+        this.ratio = 1;
+        this.initialSize = 0;
+
+        this.domNode = this.$.cropperContainer;
+        this.domNode.classList.add('icropper');
+        // this.preview = ['previewSmall']
+        // this.preview = ['previewThumb']
+
+
+        var self = this;
+        setTimeout(function(){
+          self._init();
+        },100);
+
+        // this.imgNode = document.createElement('img')
+
+      },
+      on_upload_dialog: function () {
+        var elem = this.$.fileInput;
+        if(elem && document.createEvent) { // sanity check
+          var evt = document.createEvent('MouseEvents');
+          evt.initEvent('click', true, false);
+          elem.dispatchEvent(evt);
+        }
+      },
+      fileChange: function(e) {
+        var file = e.target.files[0];
+        this.file = file;
+
+        // img = URL.createObjectURL(event.target.files[0])
+        this.setImageFile(file);
+      },
+      _init:function() {
+        this.domNode.classList.add('icropper');
+        this._buildRendering();
+        this._updateUI();
+        // util.connect(this.cropNode, 'mousedown', this, '_onMouseDown');
+        // util.connect(document, 'mouseup', this, '_onMouseUp');
+        // util.connect(document, 'mousemove', this, '_onMouseMove');
+        util.connect(this.cropNode, 'down', this, '_onDown');
+        // util.connect(document, 'track', this, '_onTrack');
+        util.connect(this.cropNode, 'track', this, '_onTrack');
+        util.connect(this.cropNode, 'up', this, '_onUp');
+        // this.image && this.setImage(this.image);
+
+        // if (this.preview) {
+        //   var self = this;
+        //   util.each(this.preview, function(node) {
+        //     self.bindPreview(node)
+        //   })
+        // }
+
+      },
+      setImageFile: function(file) {
+            // summary:
+            //  Set the image to be cropped. The container size will fit the image.
+            var img = new Image();
+            img.src = URL.createObjectURL(file);
+            // this.image = url;
+            var self = this;
+
+            if (!this.imageNode) {
+              var imgNode = util.create('img');
+              this.imageNode = imgNode;
+              this.domNode.appendChild(this.imageNode);
+
+              this.imageNode.onload = function(){
+                self._setSize(this.offsetWidth, this.offsetHeight);
+                if (self.preview) {
+                  util.each(self.preview, function(node) {
+                    self.bindPreview(node);
+                  });
+                }
+              };
+            }
+
+            this.imageNode.src = img.src;
+
+      },
+      setImage: function(url) {
+            // summary:
+            //  Set the image to be cropped. The container size will fit the image.
+            var img = new Image();
+            img.src = url;
+            this.image = url;
+            if (!this.imageNode) {
+                this.imageNode = util.create('img');
+                this.domNode.appendChild(this.imageNode);
+                var self = this;
+                //TODO: onerror?
+                this.imageNode.onload = function(){
+                  self._setSize(this.offsetWidth, this.offsetHeight);
+                };
+            }
+            this.imageNode.src = url;
+
+
+      },
+
+      onChange: function() {
+          //Event:
+          //    When the cropping size is changed.
+      },
+      onComplete: function() {
+            //Event:
+            //    When mouseup.
+      },
+      getInfo: function() {
+          // summary:
+          //  Get the cropping infomation. Such as being used by server side for real cropping.
+          return {
+              w: this.cropNode.offsetWidth - 2,   //2 is hard code border width
+              h: this.cropNode.offsetHeight - 2,
+              l: parseInt(util.style(this.cropNode, 'left')),
+              t: parseInt(util.style(this.cropNode, 'top')),
+              cw: this.domNode.offsetWidth, //container width
+              ch: this.domNode.offsetHeight, //container height
+          };
+      },
+      bindPreview: function(node) {
+            node = util.byId(node);
+
+            util.style(node, {overflow: 'hidden'});
+
+            var old = util.byId('previewimg');
+            if (old) {
+              old.remove();
+            }
+
+            var width = parseInt(util.style(node, 'width')),
+                height = parseInt(util.style(node, 'height'));
+
+
+            var previewImage = util.create('img', {src: this.imageNode.src, id:'previewimg'});
+            node.appendChild(previewImage);
+
+            var _oldOnChange = this.onChange;
+
+            this.onChange = function(info){
+                _oldOnChange.call(this, info);
+
+                var r = info.w/info.h,
+                    w2 = height*r,
+                    h2 = width/r;
+
+                if(w2 >= width) {w2 = width;}
+                if(h2 >= height) {h2 = height;}
+                util.style(node, {width: w2 + 'px', height: h2 + 'px'});
+
+                var rateX =  w2/info.w,
+                    rateY = h2/info.h;
+
+                util.style(previewImage , {
+                    width: info.cw*rateX + 'px',
+                    height:info.ch*rateY + 'px',
+                    marginLeft: -info.l*rateX + 'px',
+                    marginTop: -info.t*rateY + 'px'
+                });
+            };
+      },
+      onUpload: function() {
+        var self = this;
+
+        var info = this.getInfo();
+        var canvas = document.createElement('canvas');
+        var img = this.imageNode;
+        // var width = parseInt(util.style(img, 'width'));
+        // var height = parseInt(util.style(img, 'height'));
+        var iw = img.width;
+        // var ih = img.height;
+        var nw = img.naturalWidth;
+        // var nh = img.naturalHeight;
+
+        var s1 = nw/iw;
+
+
+
+
+        canvas.width= 600;
+        canvas.height= 600;
+        var context = canvas.getContext('2d');
+
+
+
+        context.drawImage(img, info.l*s1, info.t*s1, info.w*s1, info.h*s1, 0, 0, 600, 600);
+        // context.drawImage(img, ml, mh, w, h, 0, 0, info.w, info.h);
+        // context.drawImage(img, 0,0, img.width, img.height, 0,0, img.width, img.height);
+        var fullQuality = canvas.toDataURL('image/jpeg', 1.0);
+
+        var blob = dataURItoBlob(fullQuality);
+        var fd = new FormData();
+
+        fd.append('file', blob);
+
+        var xhr = this.xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', function(e) {
+          var done = e.loaded, total = e.total;
+          self.progress = Math.floor(done/total*1000)/10;
+        });
+        xhr.open('POST', this.uploadUrl, true);
+        if (this.authToken) {
+          xhr.setRequestHeader('Authorization','Bearer ' + this.authToken);
+        }
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            self.$.toastSuccess.show();
+            // self.fire('success', {xhr: xhr});
+            self.fire('iron-signal', {name: 'imageupload', data: xhr});
+          } else {
+            self.$.toastFail.show();
+            self.fire('error', {xhr: xhr});
+          }
+        };
+        this.progressInvisible = false;
+        xhr.send(fd);
+
+      },
+      _updateUI: function() {
+        this._posAnchors();
+        this._posBlocks();
+      },
+      _buildRendering: function() {
+            this._anchors = {};
+            this._blockNodes = {};
+
+            this.cropNode = util.create('div', {className: 'crop-node no-select'});
+            this.domNode.appendChild(this.cropNode);
+
+            //Create anchors
+            var arr = ['lt', 't', 'rt', 'r', 'rb', 'b', 'lb', 'l'];
+            var i, n;
+            for (i = 0; i < 8; i++) {
+                n = util.create('div', {className: 'anchor anchor-' + arr[i]});
+                this.cropNode.appendChild(n);
+                this._anchors[arr[i]] = n;
+            }
+
+            //Create blocks for showing dark areas
+            arr = ['l', 't', 'r', 'b'];
+            for (i = 0; i < 4; i++) {
+                n = util.create('div', {className: 'block block-' + arr[i]});
+                this.domNode.appendChild(n);
+                this._blockNodes[arr[i]] = n;
+            }
+      },
+      _posAnchors: function() {
+            var a = this._anchors,
+                w = this.cropNode.offsetWidth,
+                h = this.cropNode.offsetHeight;
+            w = w / 2 - 4 + 'px';
+            h = h / 2 - 4 + 'px';
+            a.t.style.left = a.b.style.left = w;
+            a.l.style.top = a.r.style.top = h;
+
+      },
+      _posBlocks: function() {
+            // var p = this.startedPos,
+            var b = this._blockNodes;
+            var l = parseInt(util.style(this.cropNode, 'left'));
+            var t = parseInt(util.style(this.cropNode, 'top'));
+            var w = this.cropNode.offsetWidth;
+            var ww = this.domNode.offsetWidth;
+            var h = this.cropNode.offsetHeight;
+            var hh = this.domNode.offsetHeight;
+
+            b = this._blockNodes;
+            b.t.style.height = b.l.style.top = b.r.style.top = t + 'px';
+
+            b.l.style.height = b.r.style.height = h + 'px';
+            b.l.style.width = l + 'px';
+
+
+            w = ww - w - l;
+            h = hh - h - t;
+
+            //fix IE
+            if(w < 0) {w = 0;}
+            if(h < 0) {h = 0;}
+
+            b.r.style.width = w + 'px';
+            b.b.style.height = h + 'px';
+      },
+      _setSize: function(w, h) {
+
+            this.domNode.style.width = w + 'px';
+            this.domNode.style.height = h + 'px';
+
+            var w2, h2;
+            if (this.initialSize) {
+                var m = Math.min(w, h, this.initialSize);
+                w2 = h2 = m - 2 + 'px';
+            }else{
+                w2 = w - this.gap * 2 - 2;
+                h2 = h - this.gap * 2 - 2;
+                if(this.ratio){
+                    var _w2 = h2*this.ratio, _h2 = w2/this.ratio;
+                    if(w2 > _w2) {w2 = _w2;}
+                    if(h2 > _h2) {h2 = _h2;}
+
+                }
+                w2 += 'px';
+                h2 += 'px';
+            }
+
+            var s = this.cropNode.style;
+            s.width = w2;
+            s.height = h2;
+
+            var l = (w - this.cropNode.offsetWidth) / 2,
+                t = (h - this.cropNode.offsetHeight) / 2;
+
+            if (l < 0) {l = 0;}
+            if (t < 0) {t = 0;}
+
+            s.left = l + 'px';
+            s.top = t + 'px';
+
+            this._posAnchors();
+            this._posBlocks();
+            this.onChange(this.getInfo());
+
+      },
+
+      _onDown: function(e) {
+
+            var n = this.cropNode;//, s = n.style;
+            this.dragging = (e.target === n) ? 'move' : e.target.className;
+            if(this.dragging !== 'move'){
+                var arr = this.dragging.split(' ');
+                this.dragging = arr.pop().split('-')[1];
+            }
+
+            this.startedPos = {
+                x: e.detail.x,
+                y: e.detail.y,
+                h: n.offsetHeight - 2, //2 is border width
+                w: n.offsetWidth - 2,
+                l: parseInt(util.style(n, 'left')),
+                t: parseInt(util.style(n, 'top'))
+            };
+            var c = util.style(e.target, 'cursor');
+            util.style(document.body, {
+                cursor: c
+            });
+            util.style(this.cropNode, {
+                cursor: c
+            });
+            util.addCss(document.body, 'no-select');
+            util.addCss(document.body, 'unselectable');//for IE
+            // e.preventDefault();
+
+
+      },
+      _onUp: function() {
+            this.dragging = false;
+            util.style(document.body, {
+                cursor: 'default'
+            });
+            util.style(this.cropNode, {
+                cursor: 'move'
+            });
+            util.rmCss(document.body, 'no-select');
+            util.rmCss(document.body, 'unselectable');
+            // this.onComplete && this.onComplete(this.getInfo());
+            this.onComplete(this.getInfo());
+      },
+      _onTrack: function(e) {
+            if (!this.dragging) {return;}
+            if (this.dragging === 'move') {this._doTrack(e);}
+            else {this._doTrackResize(e);}
+            this._updateUI();
+            // this.onChange && this.onChange(this.getInfo());
+            this.onChange(this.getInfo());
+            e.preventDefault();
+      },
+      _doTrack: function(e) {
+            var s = this.cropNode.style,
+                p0 = this.startedPos;
+            var l = p0.l + e.detail.x - p0.x;
+            var t = p0.t + e.detail.y - p0.y;
+            if (l < 0) {l = 0;}
+            if (t < 0) {t = 0;}
+            var maxL = this.domNode.offsetWidth - this.cropNode.offsetWidth;
+            var maxT = this.domNode.offsetHeight - this.cropNode.offsetHeight;
+            if (l > maxL) {l = maxL;}
+            if (t > maxT) {t = maxT;}
+            s.left = l + 'px';
+            s.top = t + 'px';
+
+      },
+
+      _doTrackResize: function(e) {
+
+
+            var m = this.dragging,
+                s = this.cropNode.style,
+                // cw = this.cropNode.offsetWidth,
+                // ch = this.cropNode.offsetHeight,
+                p0 = this.startedPos;
+
+            //delta x and delta y
+            var dx = e.detail.x - p0.x,
+                dy = e.detail.y - p0.y;
+
+            var ratio = this.ratio;
+            if(!ratio && e.shiftKey) {ratio = 1;}//Shiftkey is only available when there's no ratio set.
+
+            if (ratio){
+                if (m === 'l') {
+                    dy = dx/ratio;
+                    if (p0.l + dx < 0) {dx = -p0.l; dy = dx / ratio;}
+                    if (p0.t + dy < 0) {dy = -p0.t; dx = dy * ratio;}
+                    m = 'lt';
+                } else if (m === 'r') {
+                    dy = dx/ratio;
+                    m = 'rb';
+                } else if (m === 'b') {
+                    dx = dy*ratio;
+                    m = 'rb';
+                } else if (m === 'lt') {
+                    dx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+                    dy = dx/ratio;
+                    if (p0.l + dx < 0) {dx = -p0.l; dy = dx / ratio;}
+                    if (p0.t + dy < 0) {dy = -p0.t; dx = dy * ratio;}
+                } else if (m === 'lb') {
+                    dx = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
+                    dy = -dx/ratio;
+                    if (p0.l + dx < 0) {
+                        dx = -p0.l;
+                        dy = p0.l;
+                    }
+                } else if (m === 'rt' || m === 't') {
+                    dx = -dy*ratio;
+                    m = 'rt';
+                    if (p0.t + dy < 0) {
+                        dy = -p0.t;
+                        dx = -dy;
+                    }
+                }
+            }
+            if (/l/.test(m)) {
+                dx = Math.min(dx, p0.w - this.minWidth);
+                if (p0.l + dx >= 0) {
+                    s.left = p0.l + dx + 'px';
+                    s.width = p0.w - dx + 'px';
+                } else {
+                    s.left = 0;
+                    s.width = p0.l + p0.w + 'px';
+                }
+            }
+            if (/t/.test(m)) {
+                dy = Math.min(dy, p0.h - this.minHeight);
+                if (p0.t + dy >= 0) {
+                    s.top = p0.t + dy + 'px';
+                    s.height = p0.h - dy + 'px';
+                } else {
+                    s.top = 0;
+                    s.height = p0.t + p0.h + 'px';
+                }
+            }
+            if (/r/.test(m)) {
+                dx = Math.max(dx, this.minWidth - p0.w);
+                if (p0.l + p0.w + dx <= this.domNode.offsetWidth) {
+                    s.width = p0.w + dx + 'px';
+                } else {
+                    s.width = this.domNode.offsetWidth - p0.l - 2 + 'px';
+                }
+            }
+            if (/b/.test(m)) {
+                dy = Math.max(dy, this.minHeight - p0.h);
+                if (p0.t + p0.h + dy <= this.domNode.offsetHeight) {
+                    s.height = p0.h + dy + 'px';
+                } else {
+                    s.height = this.domNode.offsetHeight - p0.t - 2 + 'px';
+                }
+            }
+
+            if(ratio){
+                var w = parseInt(s.width), h = parseInt(s.height);
+                var w2 = h * ratio, h2 = w/ratio;
+                if(w2 < w){
+                    if (/l/.test(m)) {
+                        s.left = parseInt(s.left) + w - w2 + 'px';
+                    }
+                    w = w2;
+                }
+                if(h2 < h){
+                    if (/t/.test(m)){
+                        s.top = parseInt(s.top) + h - h2 + 'px';
+                    }
+                    h = h2;
+                }
+                s.width = w + 'px';
+                s.height = h + 'px';
+            }
+
+
+      }
+
+    });
+
+    var util = {
+        mixin: function(dest, src){
+            for(var p in src) {dest[p] = src[p];}
+        },
+        byId: function(id){
+            if(typeof id === 'string') {return document.getElementById(id);}
+            else {return id;}
+        },
+        create: function(tag, attrs){
+            var node = document.createElement(tag);
+            this.mixin(node, attrs);
+            return node;
+        },
+        connect: function(node, evtType, context, callback){
+            //TODO: use event listeners instead
+            // var self = this;
+            function handler(evt){
+                // evt = self.fixEvent(evt);
+                context[callback](evt);
+            }
+            if(node.attachEvent) {node.attachEvent('on' + evtType, handler);}
+            else {node.addEventListener(evtType, handler, false);}
+        },
+        style: function(node, args){
+            if(typeof args === 'string'){
+                var value = node.style[args];
+                if(!value){
+                    var s = window.getComputedStyle ? getComputedStyle(node) : node.currentStyle;
+                    value = s[args];
+                }
+                return value;
+            } else {this.mixin(node.style, args);}
+        },
+        each: function(arr, callback){
+            for(var i = 0; i < arr.length; i++) {
+                callback(arr[i], i);
+            }
+        },
+        indexOf: function(arr, value){
+            for(var i = 0; i < arr.length; i++) {
+                if(value === arr[i]) {return i;}
+            }
+            return -1;
+        },
+        addCss: function(node, css){
+            if(!node) {return;}
+            var cn = node.className || '', arr = cn.split(' '), i = util.indexOf(arr, css);
+            if(i < 0) {arr.push(css);}
+            node.className = arr.join(' ');
+        },
+        rmCss: function(node, css){
+            if(!node) {return;}
+            var cn = node.className || '', arr = cn.split(' '), i = util.indexOf(arr, css);
+            if(i >= 0) {arr.splice(i, 1);}
+            node.className = arr.join(' ');
+        },
+        fixEvent: function(evt){
+            evt = evt || event;
+            if(!evt.target) {evt.target = evt.srcElement;}
+            if(!evt.keyCode) {evt.keyCode = evt.which || evt.charCode;}
+            if(!evt.pageX){//only for IE
+               evt.pageX = evt.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+               evt.pageY = evt.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+            }
+            return evt;
+        }
+    };
+
+
+    function dataURItoBlob(dataURI) {
+        // convert base64/URLEncoded data component to raw binary data held in a string
+        var byteString;
+        if (dataURI.split(',')[0].indexOf('base64') >= 0) {
+            byteString = atob(dataURI.split(',')[1]);
+        } else {
+            byteString = decodeURI(dataURI.split(',')[1]);
+        }
+
+        // separate out the mime component
+        var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+        // write the bytes of the string to a typed array
+        var ia = new Uint8Array(byteString.length);
+        for (var i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+
+        return new Blob([ia], {type:mimeString});
+    }
+
+
+
+  })();
+  </script>
+</dom-module>
+
+
+<!--
+
+      _onMouseDown: function(e) {
+
+            var n = this.cropNode, s = n.style;
+            this.dragging = (e.target == n) ? 'move' : e.target.className;
+            if(this.dragging != 'move'){
+                var arr = this.dragging.split(' ');
+                this.dragging = arr.pop().split('-')[1];
+            }
+
+            this.startedPos = {
+                x: e.pageX
+                ,y: e.pageY
+                ,h: n.offsetHeight - 2 //2 is border width
+                ,w: n.offsetWidth - 2
+                ,l: parseInt(util.style(n, 'left'))
+                ,t: parseInt(util.style(n, 'top'))
+            }
+            var c = util.style(e.target, 'cursor');
+            util.style(document.body, {
+                cursor: c
+            });
+            util.style(this.cropNode, {
+                cursor: c
+            });
+            util.addCss(document.body, 'no-select');
+            util.addCss(document.body, 'unselectable');//for IE
+
+
+      },
+      _onMouseUp: function(e) {
+            this.dragging = false;
+            util.style(document.body, {
+                cursor: 'default'
+            });
+            util.style(this.cropNode, {
+                cursor: 'move'
+            });
+            util.rmCss(document.body, 'no-select');
+            util.rmCss(document.body, 'unselectable');
+            this.onComplete && this.onComplete(this.getInfo());
+      },
+      _onMouseMove: function(e) {
+            if (!this.dragging) return;
+            if (this.dragging == 'move') this._doMove(e);
+            else this._doResize(e);
+            this._updateUI();
+            this.onChange && this.onChange(this.getInfo());
+      },
+    _doMove: function(e) {
+            var s = this.cropNode.style,
+                p0 = this.startedPos;
+            var l = p0.l + e.pageX - p0.x;
+            var t = p0.t + e.pageY - p0.y;
+            if (l < 0) l = 0;
+            if (t < 0) t = 0;
+            var maxL = this.domNode.offsetWidth - this.cropNode.offsetWidth;
+            var maxT = this.domNode.offsetHeight - this.cropNode.offsetHeight;
+            if (l > maxL) l = maxL;
+            if (t > maxT) t = maxT;
+            s.left = l + 'px';
+            s.top = t + 'px'
+
+
+      },
+      _doResize: function(e) {
+
+
+            var m = this.dragging
+                ,s = this.cropNode.style
+                ,cw = this.cropNode.offsetWidth
+                ,ch = this.cropNode.offsetHeight
+                ,p0 = this.startedPos
+                ;
+            //delta x and delta y
+            var dx = e.pageX - p0.x,
+                dy = e.pageY - p0.y;
+
+            var ratio = this.ratio;
+            if(!ratio && e.shiftKey)ratio = 1;//Shiftkey is only available when there's no ratio set.
+
+            if (ratio){
+                if (m == 'l') {
+                    dy = dx/ratio;
+                    if (p0.l + dx < 0) {dx = -p0.l; dy = dx / ratio;}
+                    if (p0.t + dy < 0) {dy = -p0.t; dx = dy * ratio;}
+                    m = 'lt';
+                } else if (m == 'r') {
+                    dy = dx/ratio;
+                    m = 'rb';
+                } else if (m == 'b') {
+                    dx = dy*ratio;
+                    m = 'rb';
+                } else if (m == 'lt') {
+                    dx = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+                    dy = dx/ratio;
+                    if (p0.l + dx < 0) {dx = -p0.l; dy = dx / ratio;}
+                    if (p0.t + dy < 0) {dy = -p0.t; dx = dy * ratio;}
+                } else if (m == 'lb') {
+                    dx = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
+                    dy = -dx/ratio;
+                    if (p0.l + dx < 0) {
+                        dx = -p0.l;
+                        dy = p0.l;
+                    }
+                } else if (m == 'rt' || m == 't') {
+                    dx = -dy*ratio;
+                    m = 'rt';
+                    if (p0.t + dy < 0) {
+                        dy = -p0.t;
+                        dx = -dy;
+                    }
+                }
+            }
+            if (/l/.test(m)) {
+                dx = Math.min(dx, p0.w - this.minWidth);
+                if (p0.l + dx >= 0) {
+                    s.left = p0.l + dx + 'px';
+                    s.width = p0.w - dx + 'px';
+                } else {
+                    s.left = 0;
+                    s.width = p0.l + p0.w + 'px';
+                }
+            }
+            if (/t/.test(m)) {
+                dy = Math.min(dy, p0.h - this.minHeight);
+                if (p0.t + dy >= 0) {
+                    s.top = p0.t + dy + 'px';
+                    s.height = p0.h - dy + 'px';
+                } else {
+                    s.top = 0;
+                    s.height = p0.t + p0.h + 'px';
+                }
+            }
+            if (/r/.test(m)) {
+                dx = Math.max(dx, this.minWidth - p0.w);
+                if (p0.l + p0.w + dx <= this.domNode.offsetWidth) {
+                    s.width = p0.w + dx + 'px';
+                } else {
+                    s.width = this.domNode.offsetWidth - p0.l - 2 + 'px';
+                }
+            }
+            if (/b/.test(m)) {
+                dy = Math.max(dy, this.minHeight - p0.h);
+                if (p0.t + p0.h + dy <= this.domNode.offsetHeight) {
+                    s.height = p0.h + dy + 'px';
+                } else {
+                    s.height = this.domNode.offsetHeight - p0.t - 2 + 'px';
+                }
+            }
+
+            if(ratio){
+                var w = parseInt(s.width), h = parseInt(s.height);
+                var w2 = h * ratio, h2 = w/ratio;
+                if(w2 < w){
+                    if (/l/.test(m)) {
+                        s.left = parseInt(s.left) + w - w2 + 'px';
+                    }
+                    w = w2;
+                }
+                if(h2 < h){
+                    if (/t/.test(m)){
+                        s.top = parseInt(s.top) + h - h2 + 'px';
+                    }
+                    h = h2;
+                }
+                s.width = w + 'px';
+                s.height = h + 'px';
+            }
+
+
+      }, -->
