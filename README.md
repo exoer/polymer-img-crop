@@ -11,3 +11,4 @@ Parameters:
 
 `<img-crop upload-url='{{uploadUrl}}' auth-token='[[authdata.token]]'></img-crop>`
 
+[screenshot](screen_shot.png)
