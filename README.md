@@ -9,7 +9,7 @@ Parameters:
 - urlUpload
 - authToken: optional authentication token (jws) for the header 
 
-`<img-crop upload-url='{{uploadUrl}}' auth-token='[[authdata.token]]'></img-crop>`
+`<img-crop upload-url='[[uploadUrl]]' auth-token='[[authdata.token]]'></img-crop>`
 
 [screenshot][screenshot]
 
