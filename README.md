@@ -13,4 +13,4 @@ Parameters:
 
 [screenshot][screenshot]
 
-[screenshot]: screen_shot.png
+[screenshot]: https://github.com/exoer/polymer-img-crop/blob/master/screen_shot.png
