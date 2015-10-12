@@ -11,6 +11,4 @@ Parameters:
 
 `<img-crop upload-url='[[uploadUrl]]' auth-token='[[authdata.token]]'></img-crop>`
 
-[screenshot][screenshot]
-
-[screenshot]: https://github.com/exoer/polymer-img-crop/blob/master/screen_shot.png
+![screenshot](https://github.com/exoer/polymer-img-crop/blob/master/screen_shot.png)
